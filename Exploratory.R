@@ -9,9 +9,11 @@ df_trades <- read_csv("Archive/trb_usdt_trades_export.csv") %>% select(-symbol)
 # Ensure time is POSIXct
 df_spot <- df_spot %>%
   arrange(time) %>% mutate(price = (bid_price + ask_price)/2) %>%
-  mutate(bid_change = (bid_price - lag(bid_price))*10000,
-  ask_change = (ask_price - lag(ask_price))*10000,
-  price_change = (price - lag(price))*10000) %>%
+  mutate(bid_change = (log(bid_price) - log(lag(bid_price)))*10000,
+  ask_change = (log(ask_price) - log(lag(ask_price)))*10000,
+  price_change = (log(price) - log(lag(price)))*10000)
+
+df_spot <- df_spot %>%
   mutate(bid_change_3ms = map_dbl(row_number(), function(i) {
     t0 <- time[i]
     idx <- which(time >= t0 - 0.003 & time <= t0)
@@ -34,9 +36,11 @@ df_spot <- df_spot %>%
 
 df_futures <- df_futures %>%
   arrange(time) %>% mutate(price = (bid_price + ask_price)/2) %>%
-  mutate(bid_change = (bid_price - lag(bid_price))*10000,
-  ask_change = (ask_price - lag(ask_price))*10000,
-  price_change = (price - lag(price))*10000) %>%
+  mutate(bid_change = (log(bid_price) - log(lag(bid_price)))*10000,
+         ask_change = (log(ask_price) - log(lag(ask_price)))*10000,
+         price_change = (log(price) - log(lag(price)))*10000)
+
+df_futures <- df_futures %>%
   mutate(bid_change_3ms = map_dbl(row_number(), function(i) {
     t0 <- time[i]
     idx <- which(time >= t0 - 0.003 & time <= t0)
