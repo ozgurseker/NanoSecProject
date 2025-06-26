@@ -1,4 +1,5 @@
 library(tidyverse)
+library(timeplyr)
 
 op <- options(digits.secs=3)
 df_futures <- read_csv("Archive/trb_usdt_futures_export.csv") %>% select(-symbol)
@@ -11,55 +12,32 @@ df_spot <- df_spot %>%
   arrange(time) %>% mutate(price = (bid_price + ask_price)/2) %>%
   mutate(bid_change = (log(bid_price) - log(lag(bid_price)))*10000,
   ask_change = (log(ask_price) - log(lag(ask_price)))*10000,
-  price_change = (log(price) - log(lag(price)))*10000)
-
-df_spot <- df_spot %>%
-  mutate(bid_change_3ms = map_dbl(row_number(), function(i) {
-    t0 <- time[i]
-    idx <- which(time >= t0 - 0.003 & time <= t0)
-    sum(bid_change[idx], na.rm = TRUE)
-  }),
-  ask_change_3ms = map_dbl(row_number(), function(i) {
-    t0 <- time[i]
-    idx <- which(time >= t0 - 0.003 & time <= t0)
-    sum(ask_change[idx], na.rm = TRUE)
-  }),
-  price_change_3ms = map_dbl(row_number(), function(i) {
-    t0 <- time[i]
-    idx <- which(time >= t0 - 0.003 & time <= t0)
-    sum(price_change[idx], na.rm = TRUE)
-  })) %>% mutate(
+  price_change = (log(price) - log(lag(price)))*10000) %>% 
+  mutate(
+  bid_change3ms = time_roll_sum(x = bid_change, window = "3 milliseconds", time = time),
+  ask_change3ms = time_roll_sum(x = ask_change, window = "3 milliseconds", time = time),
+  price_change3ms = time_roll_sum(x = price_change, window = "3 milliseconds", time = time),
+  ) %>% mutate(
     sudden_bid_change = bid_change_3ms > 7,
     sudden_ask_change = ask_change_3ms > 7,
     sudden_price_change = price_change_3ms > 7
   )
 
+
 df_futures <- df_futures %>%
   arrange(time) %>% mutate(price = (bid_price + ask_price)/2) %>%
   mutate(bid_change = (log(bid_price) - log(lag(bid_price)))*10000,
          ask_change = (log(ask_price) - log(lag(ask_price)))*10000,
-         price_change = (log(price) - log(lag(price)))*10000)
-
-df_futures <- df_futures %>%
-  mutate(bid_change_3ms = map_dbl(row_number(), function(i) {
-    t0 <- time[i]
-    idx <- which(time >= t0 - 0.003 & time <= t0)
-    sum(bid_change[idx], na.rm = TRUE)
-  }),
-  ask_change_3ms = map_dbl(row_number(), function(i) {
-    t0 <- time[i]
-    idx <- which(time >= t0 - 0.003 & time <= t0)
-    sum(ask_change[idx], na.rm = TRUE)
-  }),
-  price_change_3ms = map_dbl(row_number(), function(i) {
-    t0 <- time[i]
-    idx <- which(time >= t0 - 0.003 & time <= t0)
-    sum(price_change[idx], na.rm = TRUE)
-  })) %>% mutate(
+         price_change = (log(price) - log(lag(price)))*10000) %>% 
+  mutate(
+    bid_change3ms = time_roll_sum(x = bid_change, window = "3 milliseconds", time = time),
+    ask_change3ms = time_roll_sum(x = ask_change, window = "3 milliseconds", time = time),
+    price_change3ms = time_roll_sum(x = price_change, window = "3 milliseconds", time = time),
+  ) %>% mutate(
     sudden_bid_change = bid_change_3ms > 7,
     sudden_ask_change = ask_change_3ms > 7,
     sudden_price_change = price_change_3ms > 7
-  ) 
+  )
 
 max_return <- function(df, t0, delta_t) {
   df <- df %>% filter(time >= t0 & time <= t0 + delta_t)
