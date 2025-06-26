@@ -53,3 +53,8 @@ traded_qty <- function(df, t0, delta_t) {
   df <- df %>% filter(time >= t0-delta_t & time <= t0)
   return(sum(df$quantity))
 }
+
+# Interested oldugun suddenchange ile diger datayi birlestir, 
+# suddenchangeden sonra gelen ilk observationlari sil
+# Sonra cumsum ve max 
+
