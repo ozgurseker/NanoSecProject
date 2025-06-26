@@ -66,3 +66,8 @@ min_return <- function(df, t0, delta_t) {
   df <- df %>% filter(time >= t0 & time <= t0 + delta_t)
   return(min(cumsum(df$price_change)))
 }
+
+traded_qty <- function(df, t0, delta_t) {
+  df <- df %>% filter(time >= t0-delta_t & time <= t0)
+  return(sum(df$quantity))
+}
