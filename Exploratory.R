@@ -18,9 +18,9 @@ df_spot <- df_spot %>%
   ask_change3ms = time_roll_sum(x = ask_change, window = "3 milliseconds", time = time),
   price_change3ms = time_roll_sum(x = price_change, window = "3 milliseconds", time = time),
   ) %>% mutate(
-    sudden_bid_change = bid_change_3ms > 7,
-    sudden_ask_change = ask_change_3ms > 7,
-    sudden_price_change = price_change_3ms > 7
+    sudden_bid_change = bid_change3ms > 7,
+    sudden_ask_change = ask_change3ms > 7,
+    sudden_price_change = price_change3ms > 7
   )
 
 
@@ -34,9 +34,9 @@ df_futures <- df_futures %>%
     ask_change3ms = time_roll_sum(x = ask_change, window = "3 milliseconds", time = time),
     price_change3ms = time_roll_sum(x = price_change, window = "3 milliseconds", time = time),
   ) %>% mutate(
-    sudden_bid_change = bid_change_3ms > 7,
-    sudden_ask_change = ask_change_3ms > 7,
-    sudden_price_change = price_change_3ms > 7
+    sudden_bid_change = bid_change3ms > 7,
+    sudden_ask_change = ask_change3ms > 7,
+    sudden_price_change = price_change3ms > 7
   )
 
 max_return <- function(df, t0, delta_t) {
