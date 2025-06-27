@@ -40,21 +40,31 @@ df_futures <- df_futures %>%
   )
 
 max_return <- function(df, t0, delta_t) {
-  df <- df %>% filter(time >= t0 & time <= t0 + delta_t)
-  return(max(cumsum(df$price_change)))
+  return(max(cumsum(df$price_change[df$time >= t0 & df$time <= t0 + delta_t])))
 }
 
 min_return <- function(df, t0, delta_t) {
-  df <- df %>% filter(time >= t0 & time <= t0 + delta_t)
-  return(min(cumsum(df$price_change)))
+  return(min(cumsum(df$price_change[df$time >= t0 & df$time <= t0 + delta_t])))
 }
 
 traded_qty <- function(df, t0, delta_t) {
-  df <- df %>% filter(time >= t0-delta_t & time <= t0)
-  return(sum(df$quantity))
+  return(sum(df$quantity[df$time >= t0-delta_t & df$time <= t0]))
 }
 
 # Interested oldugun suddenchange ile diger datayi birlestir, 
 # suddenchangeden sonra gelen ilk observationlari sil
 # Sonra cumsum ve max 
+
+spot_moves <- df_spot %>% filter(sudden_ask_change | sudden_price_change)
+
+library(tibbletime)
+
+futures5ms <- df_futures %>% tbl_time(index = time) %>% 
+  collapse_by(period = "5 ms", side = "start", clean = T) %>% 
+  group_by(time) %>% summarise(max_5ms = max(cumsum(price_change)),
+                               min_5ms = min(cumsum(price_change))) %>% 
+  select(time, max_5ms, min_5ms)
+
+m_future5ms_spotmoves <- survival::neardate(1:nrow(spot_moves), 1:nrow(futures5ms), 
+                                            spot_moves$time,futures5ms$time, best = "after")
 
