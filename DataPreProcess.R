@@ -13,6 +13,12 @@ df <- df %>% left_join(df_futures %>% rename(bid_futures = bid_price, ask_future
   left_join(df_spot %>% rename(bid_spot = bid_price, ask_spot = ask_price)) %>% 
   left_join(df_trades %>% rename(price_trade = price) %>% select(-is_market_maker))
 
+df <- df %>% distinct()
+
+rm(df_futures)
+rm(df_spot)
+rm(df_trades)
+
 df <- df[order(nrow(df):1),]
 
 df <- df %>% 
@@ -31,7 +37,33 @@ df <- df %>%
   mutate(price_futures = (bid_futures + ask_futures)/2,
          d_bid_futures = (log(bid_futures) - log(lag(bid_futures)))*10000,
          d_ask_futures = (log(ask_futures) - log(lag(ask_futures)))*10000,
-         d_price_futures = (log(price_futures) - log(lag(price_futures)))*10000) %>%
+         d_price_futures = (log(price_futures) - log(lag(price_futures)))*10000)
+
+
+df %>% mutate(
+  sudden_bid_change_s = d_bid_spot > 5,
+  sudden_bid_change_f = d_bid_futures > 5,
+  #sudden_price_change_f = abs(price_change3ms_f) > 7
+) %>% 
+  filter(sudden_bid_change_s | sudden_bid_change_f) %>% select(time, sudden_bid_change_s, sudden_bid_change_f) %>%
+  rename(spot_increase =sudden_bid_change_s, futures_increase = sudden_bid_change_f) %>% 
+  pivot_longer(cols = c("spot_increase", "futures_increase")) %>% filter(value) %>%
+  ggplot() + geom_point(aes(x = time, y = 1, color = name))
+
+
+
+
+
+
+
+
+
+
+
+
+
+#### Sonra belki donersin ####
+df <- df %>% filter(abs(d_bid_futures) + abs(d_ask_futures)  0.5) %>%
   mutate(
     bid_change3ms_s = time_roll_apply(x = d_bid_spot, window = "3 milliseconds", time = time, fun = function(x) max(cumsum(x))),
     ask_change3ms_s = time_roll_apply(x = d_ask_spot, window = "3 milliseconds", time = time, fun = function(x) min(cumsum(x))),
@@ -51,6 +83,4 @@ df <- df %>%
     #sudden_price_change_f = abs(price_change3ms_f) > 7
   )
 
-df %>% filter(sudden_bid_change_s, sudden_bid_change_f) %>% select(time, sudden_bid_change_s, sudden_bid_change_f) %>%
-  rename(spot_increase =sudden_bid_change_s, futures_increase = sudden_bid_change_f) %>% 
-  pivot_longer(cols = c("spot_increase", "futures_increase")) %>% distinct() %>% View()
+
