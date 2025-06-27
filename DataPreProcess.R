@@ -122,5 +122,8 @@ df_suddenchanges <- df %>% filter(abs(d_bid_spot) > 1 | abs(d_ask_spot) > 1 | qu
   )
 
 df_suddenchanges %>% filter(sudden_bid_change_s | sudden_ask_change_s | sudden_bid_change_f | sudden_ask_change_f) %>% distinct() %>%
+  select(time, sudden_bid_change_s, sudden_bid_change_f, 
+         sudden_ask_change_s, sudden_ask_change_f, quantity_rolled ) %>% 
+  distinct() %>%
   write_csv("suddenchanges.csv")
 
