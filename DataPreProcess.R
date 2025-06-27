@@ -53,4 +53,4 @@ df <- df %>%
 
 df %>% filter(sudden_bid_change_s, sudden_bid_change_f) %>% select(time, sudden_bid_change_s, sudden_bid_change_f) %>%
   rename(spot_increase =sudden_bid_change_s, futures_increase = sudden_bid_change_f) %>% 
-  pivot_longer(cols = c("spot_increase", "futures_increase"))
+  pivot_longer(cols = c("spot_increase", "futures_increase")) %>% distinct() %>% View()
