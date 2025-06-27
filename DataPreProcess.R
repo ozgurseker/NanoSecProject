@@ -1,5 +1,6 @@
 library(tidyverse)
 library(timeplyr)
+library(tibbletime)
 
 op <- options(digits.secs=9)
 df_futures <- read_csv("Archive/trb_usdt_futures_export.csv") %>% select(-symbol)
@@ -52,18 +53,54 @@ df %>% mutate(
 
 
 
+sudden_bid_increases <- df %>% mutate(
+  sudden_bid_change_s = d_bid_spot > 7,
+  sudden_bid_change_f = d_bid_futures > 7,
+  time_diff = time - lag(time)) %>% filter((sudden_bid_change_s | sudden_bid_change_f), time_diff < 0.003) %>%
+  select(time, sudden_bid_change_s, sudden_bid_change_f, quantity)
+  
+sudden_bid_increases_sum <- sudden_bid_increases %>% tbl_time(index = time) %>% 
+  collapse_by("5 ms", side = "end") %>% group_by(time) %>%
+  summarise(pre_bid_s = sum(sudden_bid_change_s), pre_bid_f = sum(sudden_bid_change_f),
+            pre_quantity = sum(quantity, na.rm = T)) %>% 
+  left_join(sudden_bid_increases %>% tbl_time(index = time) %>% 
+              collapse_by("10 ms", side = "start") %>% group_by(time) %>% 
+              summarise(post_bid_s = sum(sudden_bid_change_s), post_bid_f = sum(sudden_bid_change_f)))
+
+
+sudden_bid_increases <- sudden_bid_increases %>% left_join(sudden_bid_increases_sum) 
+
+fix_cols <- c("pre_bid_s", "pre_bid_f", "pre_quantity", "post_bid_f", "post_bid_s")
+sudden_bid_increases[fix_cols][is.na(sudden_bid_increases[fix_cols])] <- -1
+
+
+# spot to futures effect for bid changes 
+sudden_bid_increases %>% filter(sudden_bid_change_s) %>% nrow()
+sudden_bid_increases %>% filter(sudden_bid_change_s) %>% 
+  filter(pre_bid_s < 2) %>% nrow()
+sudden_bid_increases %>% filter(sudden_bid_change_s, !sudden_bid_change_f) %>% 
+  filter(pre_bid_s < 2) %>% nrow()
+sudden_bid_increases %>% filter(sudden_bid_change_s, !sudden_bid_change_f) %>% 
+  filter(pre_bid_s < 2, pre_bid_f < 1) %>% nrow()
+sudden_bid_increases %>% filter(sudden_bid_change_s, !sudden_bid_change_f) %>% 
+  filter(pre_bid_s < 2, pre_bid_f < 1, post_bid_f > 0) %>% nrow()
+
+# futures to spot effect for bid changes
+sudden_bid_increases %>% filter(sudden_bid_change_f) %>% nrow()
+sudden_bid_increases %>% filter(sudden_bid_change_f) %>% 
+  filter(pre_bid_f < 2) %>% nrow()
+sudden_bid_increases %>% filter(sudden_bid_change_f, !sudden_bid_change_s) %>% 
+  filter(pre_bid_f < 2) %>% nrow()
+sudden_bid_increases %>% filter(sudden_bid_change_f, !sudden_bid_change_s) %>% 
+  filter(pre_bid_f < 2, pre_bid_s < 1) %>% nrow()
+sudden_bid_increases %>% filter(sudden_bid_change_f, !sudden_bid_change_s) %>% 
+  filter(pre_bid_f < 2, pre_bid_s < 1, post_bid_s > 0) %>% nrow()
 
 
 
-
-
-
-
-
-
-
-#### Sonra belki donersin ####
-df <- df %>% filter(abs(d_bid_futures) + abs(d_ask_futures)  0.5) %>%
+#### Sudden Changes Save ####
+df_suddenchanges <- df %>% filter(abs(d_bid_spot) > 1 | abs(d_ask_spot) > 1 | quantity > 0 | 
+                abs(d_bid_futures) > 1 | abs(d_ask_futures) > 1 ) %>%
   mutate(
     bid_change3ms_s = time_roll_apply(x = d_bid_spot, window = "3 milliseconds", time = time, fun = function(x) max(cumsum(x))),
     ask_change3ms_s = time_roll_apply(x = d_ask_spot, window = "3 milliseconds", time = time, fun = function(x) min(cumsum(x))),
@@ -71,6 +108,7 @@ df <- df %>% filter(abs(d_bid_futures) + abs(d_ask_futures)  0.5) %>%
   ) %>% mutate(
     sudden_bid_change_s = bid_change3ms_s > 7,
     sudden_ask_change_s = ask_change3ms_s < -7,
+    quantity_rolled = time_roll_sum(x = quantity, window = "10 milliseconds", time = time)
     #sudden_price_change_s = abs(price_change3ms_s) > 7
   ) %>% 
   mutate(
@@ -83,4 +121,6 @@ df <- df %>% filter(abs(d_bid_futures) + abs(d_ask_futures)  0.5) %>%
     #sudden_price_change_f = abs(price_change3ms_f) > 7
   )
 
+df_suddenchanges %>% filter(sudden_bid_change_s | sudden_ask_change_s | sudden_bid_change_f | sudden_ask_change_f) %>% distinct() %>%
+  write_csv("suddenchanges.csv")
 
