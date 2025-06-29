@@ -132,3 +132,22 @@ df %>% filter(pre_sudden_ask_s == 0, pre_sudden_ask_f == 0,
   rename(Spot_Ask = sudden_ask_change_s,
          Futures_Ask = sudden_ask_change_f
   ) %>% filter(Spot_Ask | Futures_Ask)
+
+
+
+# Belki lazim olur dedigim regresyonlar 
+# summary(lm(max_futures_return ~ log(quantity_rolled), df %>% filter(sudden_ask_change_s, !sudden_ask_change_f) %>% 
+#              filter(quantity_rolled > 0))) %>% xtable::xtable(caption = "Sudden Ask Increase in Spot Only, Max Future Return against Log Quantity") %>% 
+#   print()
+# 
+# summary(lm(max_spot_return ~ log(quantity_rolled), df %>% filter(!sudden_ask_change_s, sudden_ask_change_f) %>% 
+#              filter(quantity_rolled > 0))) %>% xtable::xtable(caption = "Sudden Ask Increase in Futures Only, Max Spot Return against Log Quantity") %>% 
+#   print()
+# 
+# summary(lm(min_futures_return ~ log(quantity_rolled), df %>% filter(sudden_bid_change_s, !sudden_bid_change_f) %>% 
+#              filter(quantity_rolled > 0))) %>% xtable::xtable(caption = "Sudden Bid Decrease in Spot Only, Min Futures Return against Log Quantity") %>% 
+#   print()
+# 
+# summary(lm(min_spot_return ~ log(quantity_rolled), df %>% filter(!sudden_bid_change_s, sudden_bid_change_f) %>% 
+#              filter(quantity_rolled > 0))) %>% xtable::xtable(caption = "Sudden Bid Decrease in Futures Only, Min Spot Return against Log Quantity") %>% 
+#   print()

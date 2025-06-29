@@ -57,10 +57,10 @@ library(data.table)
 #             max_futures_return = max(cumsum(price_change_f), na.rm = T),
 #             min_futures_return = min(cumsum(price_change_f), na.rm = T)) 
 
-df_returns2 <- setDT(df_shorter)[, `:=`(max_spot_return = max(cumsum(df_shorter$price_change_s[between(df_shorter$time, time, time+0.01, incbounds = F)])), 
-                                        max_futures_return = max(cumsum(df_shorter$price_change_f[between(df_shorter$time, time, time+0.01, incbounds = F)])),
-                                        min_spot_return = min(cumsum(df_shorter$price_change_s[between(df_shorter$time, time, time+0.01, incbounds = F)])), 
-                                        min_futures_return = min(cumsum(df_shorter$price_change_f[between(df_shorter$time, time, time+0.01, incbounds = F)]))),
+df_returns2 <- setDT(df_shorter)[, `:=`(max_spot_return = max(cumsum(df_shorter$price_change_s[between(df_shorter$time, time, time+0.005, incbounds = F)])), 
+                                        max_futures_return = max(cumsum(df_shorter$price_change_f[between(df_shorter$time, time, time+0.005, incbounds = F)])),
+                                        min_spot_return = min(cumsum(df_shorter$price_change_s[between(df_shorter$time, time, time+0.005, incbounds = F)])), 
+                                        min_futures_return = min(cumsum(df_shorter$price_change_f[between(df_shorter$time, time, time+0.005, incbounds = F)]))),
            by = c("time")][]
 
 df_returns2 %>% select(time, max_spot_return, max_futures_return, 

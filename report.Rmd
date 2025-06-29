@@ -13,6 +13,7 @@ library(timeplyr)
 library(tibbletime)
 library(lubridate)
 library(knitr)
+# library(data.table)
 
 op <- options(digits.secs=9)
 
@@ -22,6 +23,8 @@ df_returns <- read_csv("returns.csv")
 df_sudden <- left_join(df_sudden, df_returns)
 
 df <- df_sudden %>% filter(complete.cases(.))
+df <- df %>% 
+  filter_if(~is.numeric(.), all_vars(!is.infinite(.)))
 
 ```
 
@@ -102,7 +105,7 @@ df %>% filter(sudden_bid_change_s, !sudden_bid_change_f) %>%
   xlim(c(-8,8)) + 
   scale_colour_manual(name = 'Returns', 
                       values =c('blue'='blue','red'='red'), labels = c('Min','Max')) + 
-  xlab("Futures Returns in 10ms (bps)") + ylab("Density") +
+  xlab("Futures Returns in 5ms (bps)") + ylab("Density") +
   ggtitle("Sudden Decrease in Spot Market Bids Only")
 
 ```
@@ -117,7 +120,7 @@ df %>% filter(!sudden_bid_change_s, sudden_bid_change_f) %>%
   xlim(c(-8,8)) + 
   scale_colour_manual(name = 'Returns', 
                       values =c('blue'='blue','red'='red'), labels = c('Min','Max')) + 
-  xlab("Spot Returns in 10ms (bps)") + ylab("Density") +
+  xlab("Spot Returns in 5ms (bps)") + ylab("Density") +
   ggtitle("Sudden Decrease in Futures Market Bids Only")
 
 ```
@@ -136,7 +139,7 @@ df %>% filter(sudden_ask_change_s, !sudden_ask_change_f) %>%
   xlim(c(-8,8)) + 
   scale_colour_manual(name = 'Returns', 
                       values =c('blue'='blue','red'='red'), labels = c('Min','Max')) + 
-  xlab("Futures Returns in 10ms (bps)") + ylab("Density") +
+  xlab("Futures Returns in 5ms (bps)") + ylab("Density") +
   ggtitle("Sudden Increase in Spot Market Asks Only")
 
 ```
@@ -151,7 +154,7 @@ df %>% filter(!sudden_ask_change_s, sudden_ask_change_f) %>%
   xlim(c(-8,8)) + 
   scale_colour_manual(name = 'Returns', 
                       values =c('blue'='blue','red'='red'), labels = c('Min','Max')) + 
-  xlab("Spot Returns in 10ms (bps)") + ylab("Density") +
+  xlab("Spot Returns in 5ms (bps)") + ylab("Density") +
   ggtitle("Sudden Increase in Futures Market Asks Only")
 
 ```
@@ -221,6 +224,12 @@ df <- df %>%
          pre_sudden_ask_f = ifelse(sudden_ask_change_f,pre_sudden_ask_f -1 ,pre_sudden_ask_f),
          pre_sudden_bid_s = ifelse(sudden_bid_change_s,pre_sudden_bid_s -1 ,pre_sudden_bid_s),
          pre_sudden_bid_f = ifelse(sudden_bid_change_f,pre_sudden_bid_f -1 ,pre_sudden_bid_f))
+
+df <- setDT(df)[, `:=`(post_sudden_ask_s = sum(df$sudden_ask_change_s[between(df$time, time, time+1, incbounds = F)]), 
+                                        post_sudden_ask_f = sum(df$sudden_ask_change_f[between(df$time, time, time+1, incbounds = F)]),
+                                        post_sudden_bid_s = sum(df$sudden_bid_change_s[between(df$time, time, time+1, incbounds = F)]), 
+                                        post_sudden_bid_f = sum(df$sudden_bid_change_f[between(df$time, time, time+1, incbounds = F)])),
+           by = c("time")][]
 
 
 ggplot() + geom_density(aes(x=pre_sudden_ask_f, color = "Spot"),  
