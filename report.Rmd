@@ -1,6 +1,6 @@
 ---
 title: "Report"
-author: "Ozgur"
+author: "Ozgur Seker"
 date: "2025-06-28"
 output: pdf_document
 ---
