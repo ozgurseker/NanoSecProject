@@ -13,7 +13,7 @@ library(timeplyr)
 library(tibbletime)
 library(lubridate)
 library(knitr)
-# library(data.table)
+library(data.table)
 
 op <- options(digits.secs=9)
 
