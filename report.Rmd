@@ -1,0 +1,282 @@
+---
+title: "Report"
+author: "Ozgur"
+date: "2025-06-28"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message=FALSE)
+
+library(tidyverse)
+library(timeplyr)
+library(tibbletime)
+library(lubridate)
+library(knitr)
+
+op <- options(digits.secs=9)
+
+df_sudden <- read_csv("suddenchanges.csv")
+df_returns <- read_csv("returns.csv")
+
+df_sudden <- left_join(df_sudden, df_returns)
+
+df <- df_sudden %>% filter(complete.cases(.))
+
+```
+
+## Data Prep
+
+### Sudden Changes
+
+In \textit{suddenchanges.R} script, I prepared the data of sudden changes. I followed the following steps:
+
+\begin{enumerate}
+  \item Used union of timestamps from 3 data set and joined these 3 datasets. 
+  \item Filled missing price values with linear interpolation over time
+  \item Calculated changes in bid and ask prices for futures and spot market with log difference and multiplied with 10000 to convert them to bps. If passed time since the last observation is greater than 10ms, the price differences are entered 0. 
+  \item To make calculation faster, filtered only price changes greater than 1bps in absolute value
+  \item Calculated price changes in last 3ms by summing price changes in last 3ms with rolling windows.
+  \item Also calculated the total quantity in the last 10ms and saved them as quantity\_rolled
+  \item If bid price change in last 3ms is less than -7 it is noted sudden\_bid\_change\_(s or f dependent on market)
+  \item If ask price change in last 3ms is greater than 7 it is noted sudden\_ask\_change\_(s or f dependent on market)
+  \item The points with a sudden changes have been saved at \textit{suddenchanges.csv}
+\end{enumerate}
+
+### Returns after Sudden Changes
+
+In \textit{returns.R} script, I prepared the data of returns after sudden changes. I followed the following steps:
+
+\begin{enumerate}
+  \item Followed step 1 and 2 from previous part. This time used mid-price for price changes in step 3.
+  \item To make computation faster, filtered the time stamps that have an observation in \textit{suddenchanges.csv} at least 10ms prior. 
+  \item Then calculated and saved maximum of cumulative sums of price changes in 10ms future window as well as minimum of cumulative sums. I had maximum and minimum returns after every sudden changes in all markets. 
+  \item These future returns have been saved at \textit{returns.csv}
+\end{enumerate}
+
+## Tables, Graphs and Regressions 
+
+### Average Tables
+
+In the table below, average maximum and minimum returns in 10ms for each market after sudden decreases in bid prices shown
+
+```{r, echo=FALSE, results='asis'}
+df %>% group_by(sudden_bid_change_s, sudden_bid_change_f) %>%
+  summarise(avg_spot_max = mean(max_spot_return),
+            avg_spot_min = mean(min_spot_return),
+            avg_futures_max = mean(max_futures_return),
+            avg_futures_min = mean(min_futures_return),
+            cases = n()) %>% 
+  rename(Spot_Bid = sudden_bid_change_s,
+         Futures_Bid = sudden_bid_change_f
+         ) %>% filter(Spot_Bid | Futures_Bid) %>% kable()
+```
+
+In the table below, average maximum and minimum returns in 10ms for each market after sudden increases in ask prices shown
+
+```{r, echo=FALSE, results='asis'}
+df %>% group_by(sudden_ask_change_s, sudden_ask_change_f) %>%
+  summarise(avg_spot_max = mean(max_spot_return),
+            avg_spot_min = mean(min_spot_return),
+            avg_futures_max = mean(max_futures_return),
+            avg_futures_min = mean(min_futures_return),
+            cases = n()) %>% 
+  rename(Spot_Ask = sudden_ask_change_s,
+         Futures_Ask = sudden_ask_change_f
+         ) %>% filter(Spot_Ask | Futures_Ask) %>% kable()
+```
+
+For the rest of the analysis, I will focus on the sudden changes when they happen in one market only.
+
+### Density Graphs
+
+#### Sudden Bid Price Decreases 
+
+\newblock
+
+```{r, echo=FALSE}
+
+df %>% filter(sudden_bid_change_s, !sudden_bid_change_f) %>% 
+  ggplot() + geom_density(aes(x = min_futures_return, color = "blue")) +
+  geom_density(aes(x = max_futures_return, color = "red")) + 
+  xlim(c(-8,8)) + 
+  scale_colour_manual(name = 'Returns', 
+                      values =c('blue'='blue','red'='red'), labels = c('Min','Max')) + 
+  xlab("Futures Returns in 10ms (bps)") + ylab("Density") +
+  ggtitle("Sudden Decrease in Spot Market Bids Only")
+
+```
+
+In the graph above, density of maximum and minimum returns in futures market after a bid decrease in spot market only. 
+
+```{r, echo=FALSE}
+
+df %>% filter(!sudden_bid_change_s, sudden_bid_change_f) %>% 
+  ggplot() + geom_density(aes(x = min_spot_return, color = "blue")) +
+  geom_density(aes(x = max_spot_return, color = "red")) + 
+  xlim(c(-8,8)) + 
+  scale_colour_manual(name = 'Returns', 
+                      values =c('blue'='blue','red'='red'), labels = c('Min','Max')) + 
+  xlab("Spot Returns in 10ms (bps)") + ylab("Density") +
+  ggtitle("Sudden Decrease in Futures Market Bids Only")
+
+```
+
+In the graph above, density of maximum and minimum returns in spot market after a bid decrease in futures market only. 
+
+#### Sudden Ask Price Increases 
+
+\newblock
+
+```{r, echo=FALSE}
+
+df %>% filter(sudden_ask_change_s, !sudden_ask_change_f) %>% 
+  ggplot() + geom_density(aes(x = min_futures_return, color = "blue")) +
+  geom_density(aes(x = max_futures_return, color = "red")) + 
+  xlim(c(-8,8)) + 
+  scale_colour_manual(name = 'Returns', 
+                      values =c('blue'='blue','red'='red'), labels = c('Min','Max')) + 
+  xlab("Futures Returns in 10ms (bps)") + ylab("Density") +
+  ggtitle("Sudden Increase in Spot Market Asks Only")
+
+```
+
+In the graph above, density of maximum and minimum returns in futures market after a ask increase in spot market only. 
+
+```{r, echo=FALSE}
+
+df %>% filter(!sudden_ask_change_s, sudden_ask_change_f) %>% 
+  ggplot() + geom_density(aes(x = min_spot_return, color = "blue")) +
+  geom_density(aes(x = max_spot_return, color = "red")) + 
+  xlim(c(-8,8)) + 
+  scale_colour_manual(name = 'Returns', 
+                      values =c('blue'='blue','red'='red'), labels = c('Min','Max')) + 
+  xlab("Spot Returns in 10ms (bps)") + ylab("Density") +
+  ggtitle("Sudden Increase in Futures Market Asks Only")
+
+```
+
+In the graph above, density of maximum and minimum returns in spot market after an ask increase in futures market only. 
+
+
+#### Quantity Effect 
+\newblock
+The graph below shows the effect of quantity. 
+
+```{r}
+df %>% filter(sudden_ask_change_s, !sudden_ask_change_f) %>% 
+  filter(quantity_rolled > 0) %>% filter(max_futures_return < 100) %>% 
+  ggplot() + geom_point(aes(x=log(quantity_rolled), y=max_futures_return)) + 
+  stat_smooth(aes(x=log(quantity_rolled), y=max_futures_return), se = F, method = "lm") +
+  xlab("log Rolled Quantity Traded in last 10ms") + ylab("Max Futures Return (bps)") +
+  ggtitle("Return vs Quantity after Ask Price Jump for Spot")
+
+```
+
+The graph above shows that quantity traded in the last moments plays a significant role to predict the effect. We could see similar graphs with variations but I will use this one only to show visually. The table below shows the difference between averages for higher and lower half of quantity traded before the sudden increase in spot ask.
+
+```{r}
+df %>% filter(sudden_ask_change_s, !sudden_ask_change_f) %>% 
+  mutate(UpperHalfQuantity = quantity_rolled > median(quantity_rolled)) %>%
+  mutate(QuantityTraded = ifelse(UpperHalfQuantity, "Upper Half", "Lower Half")) %>% 
+  group_by(QuantityTraded) %>% summarise(avg_max_futures_return = mean(max_futures_return),
+                                  avg_min_futures_return = mean(min_futures_return)) %>% kable()
+
+```
+
+### Linear Regressions 
+
+```{r, results='asis'}
+summary(lm(max_futures_return ~ log(quantity_rolled), df %>% filter(sudden_ask_change_s, !sudden_ask_change_f) %>% 
+     filter(quantity_rolled > 0))) %>% xtable::xtable(caption = "Sudden Ask Increase in Spot Only, Max Future Return against Log Quantity") %>% 
+  print()
+
+summary(lm(max_spot_return ~ log(quantity_rolled), df %>% filter(!sudden_ask_change_s, sudden_ask_change_f) %>% 
+             filter(quantity_rolled > 0))) %>% xtable::xtable(caption = "Sudden Ask Increase in Futures Only, Max Spot Return against Log Quantity") %>% 
+  print()
+
+summary(lm(min_futures_return ~ log(quantity_rolled), df %>% filter(sudden_bid_change_s, !sudden_bid_change_f) %>% 
+             filter(quantity_rolled > 0))) %>% xtable::xtable(caption = "Sudden Bid Decrease in Spot Only, Min Futures Return against Log Quantity") %>% 
+  print()
+
+summary(lm(min_spot_return ~ log(quantity_rolled), df %>% filter(!sudden_bid_change_s, sudden_bid_change_f) %>% 
+             filter(quantity_rolled > 0))) %>% xtable::xtable(caption = "Sudden Bid Decrease in Futures Only, Min Spot Return against Log Quantity") %>% 
+  print()
+
+```
+
+
+## More Investigation
+
+It was not clear in the previous analysis that which market triggers the other. It looks like sudden changes in both markets leads to similar returns in the other. To refine my results, I add new variables for previous sudden changes in last second. To keep the report short, I want to focus on ask increases only for spot and futures market. 
+
+```{r}
+
+df <- df %>%
+  mutate(pre_sudden_ask_s = time_roll_sum(x = sudden_ask_change_s, window = "1 seconds", time = time),
+         pre_sudden_ask_f = time_roll_sum(x = sudden_ask_change_f, window = "1 seconds", time = time),
+         pre_sudden_bid_s = time_roll_sum(x = sudden_bid_change_s, window = "1 seconds", time = time),
+         pre_sudden_bid_f = time_roll_sum(x = sudden_bid_change_f, window = "1 seconds", time = time)) %>%
+  mutate(pre_sudden_ask_s = ifelse(sudden_ask_change_s,pre_sudden_ask_s -1 ,pre_sudden_ask_s),
+         pre_sudden_ask_f = ifelse(sudden_ask_change_f,pre_sudden_ask_f -1 ,pre_sudden_ask_f),
+         pre_sudden_bid_s = ifelse(sudden_bid_change_s,pre_sudden_bid_s -1 ,pre_sudden_bid_s),
+         pre_sudden_bid_f = ifelse(sudden_bid_change_f,pre_sudden_bid_f -1 ,pre_sudden_bid_f))
+
+
+ggplot() + geom_density(aes(x=pre_sudden_ask_f, color = "Spot"),  
+                        df %>% filter(sudden_ask_change_s, !sudden_ask_change_f)) +
+  geom_density(aes(x=pre_sudden_ask_s, color = "Futures"),
+               df %>% filter(sudden_ask_change_f, !sudden_ask_change_s)) +
+  xlab("Previous Sudden Ask Increases in the Other Market (1s)")
+```
+
+The graph below shows the distribution of number of previous sudden increases in the ask price in the other market. It tells us sudden ask increases in spot market have more previous ask price jumps previously in the futures market than the other way around.
+
+```{r}
+df %>% group_by(sudden_bid_change_s, sudden_bid_change_f) %>%
+  summarise(avg_spot_max = mean(max_spot_return),
+            avg_spot_min = mean(min_spot_return),
+            avg_futures_max = mean(max_futures_return),
+            avg_futures_min = mean(min_futures_return),
+            cases = n()) %>% 
+  rename(Spot_Bid = sudden_bid_change_s,
+         Futures_Bid = sudden_bid_change_f
+         ) %>% filter(Spot_Bid | Futures_Bid) %>% kable()
+```
+
+Moreover, I generate a similar table to the first one but this time I filter the sudden ask increases that has no other sudden ask increases in the last 1 second in either market. 
+
+```{r}
+df %>% filter(pre_sudden_ask_s == 0, pre_sudden_ask_f == 0) %>%
+  group_by(sudden_ask_change_s, sudden_ask_change_f) %>%
+  summarise(avg_spot_max = mean(max_spot_return),
+            avg_spot_min = mean(min_spot_return),
+            avg_futures_max = mean(max_futures_return),
+            avg_futures_min = mean(min_futures_return),
+            cases = n()) %>% 
+  rename(Spot_Ask = sudden_ask_change_s,
+         Futures_Ask = sudden_ask_change_f
+  ) %>% filter(Spot_Ask | Futures_Ask) %>% kable()
+
+```
+
+In this table we see that highest average max and average min returns are coming from spot market when there is a sudden ask increases in the futures market only. If there was no sudden ask increases 1 second prior in either market, most powerful signal is an sudden increase in the ask price in future market to position long in the spot market. In the table below, I also filter out the cases with any type of previous bid decrease in last second to remove the mean revert effect. The same result persist. The futures market triggers the spot market more than the other way around.
+
+
+```{r}
+df %>% filter(pre_sudden_ask_s == 0, pre_sudden_ask_f == 0,
+              pre_sudden_bid_s == 0, pre_sudden_bid_f == 0) %>%
+  group_by(sudden_ask_change_s, sudden_ask_change_f) %>%
+  summarise(avg_spot_max = mean(max_spot_return),
+            avg_spot_min = mean(min_spot_return),
+            avg_futures_max = mean(max_futures_return),
+            avg_futures_min = mean(min_futures_return),
+            cases = n()) %>% 
+  rename(Spot_Ask = sudden_ask_change_s,
+         Futures_Ask = sudden_ask_change_f
+  ) %>% filter(Spot_Ask | Futures_Ask) %>% kable()
+
+```
+
+
+

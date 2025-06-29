@@ -30,20 +30,20 @@ df <- df %>%
          quantity = ifelse(is.na(quantity), 0, quantity))
 
 
-df <- df %>% 
-  mutate(price_spot = (bid_spot + ask_spot)/2,
-         d_bid_spot = (log(bid_spot) - log(lag(bid_spot)))*10000,
-         d_ask_spot = (log(ask_spot) - log(lag(ask_spot)))*10000,
-         d_price_spot = (log(price_spot) - log(lag(price_spot)))*10000) %>% 
-  mutate(price_futures = (bid_futures + ask_futures)/2,
-         d_bid_futures = (log(bid_futures) - log(lag(bid_futures)))*10000,
-         d_ask_futures = (log(ask_futures) - log(lag(ask_futures)))*10000,
-         d_price_futures = (log(price_futures) - log(lag(price_futures)))*10000)
+df <- df %>% mutate(time_diff = time - lag(time)) %>%
+  mutate(
+         d_bid_spot = ifelse(time_diff > 0.003,0,(log(bid_spot) - log(lag(bid_spot)))*10000),
+         d_ask_spot = ifelse(time_diff > 0.003,0,(log(ask_spot) - log(lag(ask_spot)))*10000)
+        ) %>% 
+  mutate(
+         d_bid_futures = ifelse(time_diff > 0.003,0,(log(bid_futures) - log(lag(bid_futures)))*10000),
+         d_ask_futures = ifelse(time_diff > 0.003,0,(log(ask_futures) - log(lag(ask_futures)))*10000),
+        )
 
 
 #### Sudden Changes Save ####
-df_suddenchanges <- df %>% filter(abs(d_bid_spot) > 1 | abs(d_ask_spot) > 1 | quantity > 0 | 
-                abs(d_bid_futures) > 1 | abs(d_ask_futures) > 1 ) %>%
+df_suddenchanges <- df %>% filter(abs(d_bid_spot) > 0 | abs(d_ask_spot) > 0 | quantity > 0 | 
+                abs(d_bid_futures) > 0 | abs(d_ask_futures) > 0 ) %>%
   mutate(
     bid_change3ms_s = time_roll_apply(x = d_bid_spot, window = "3 milliseconds", time = time, fun = function(x) min(cumsum(x))),
     ask_change3ms_s = time_roll_apply(x = d_ask_spot, window = "3 milliseconds", time = time, fun = function(x) max(cumsum(x))),
@@ -56,17 +56,24 @@ df_suddenchanges <- df %>% filter(abs(d_bid_spot) > 1 | abs(d_ask_spot) > 1 | qu
   ) %>% 
   mutate(
     bid_change3ms_f = time_roll_apply(x = d_bid_futures, window = "3 milliseconds", time = time, fun = function(x) min(cumsum(x))),
-    ask_change3ms_f = time_roll_apply(x = d_ask_futures, window = "3 milliseconds", time = time, fun = function(x) max(cumsum(x))),
+    ask_change3ms_f = time_roll_apply(x = d_ask_futures, window = "3 milliseconds", time = time, fun = function(x) max(cumsum(x)))
     #price_change3ms_f = time_roll_apply(x = d_price_futures, window = "3 milliseconds", time = time, fun = function(x) max(abs(cumsum(x)))),
   ) %>% mutate(
     sudden_bid_change_f = bid_change3ms_f < -7,
-    sudden_ask_change_f = ask_change3ms_f > 7,
+    sudden_ask_change_f = ask_change3ms_f > 7
     #sudden_price_change_f = abs(price_change3ms_f) > 7
   )
 
-df_suddenchanges %>% filter(sudden_bid_change_s | sudden_ask_change_s | sudden_bid_change_f | sudden_ask_change_f) %>% distinct() %>%
+df_suddenchanges <- df_suddenchanges %>% filter(sudden_bid_change_s | sudden_ask_change_s | sudden_bid_change_f | sudden_ask_change_f) %>% distinct() %>%
   select(time, sudden_bid_change_s, sudden_bid_change_f, 
-         sudden_ask_change_s, sudden_ask_change_f, quantity_rolled ) %>% 
-  distinct() %>%
-  write_csv("suddenchanges.csv")
+         sudden_ask_change_s, sudden_ask_change_f, quantity_rolled, 
+         bid_change3ms_f, ask_change3ms_f, bid_change3ms_s, ask_change3ms_s) %>%
+  distinct() %>% mutate(
+    bid_change3ms_f = as.numeric(bid_change3ms_f), 
+    ask_change3ms_f = as.numeric(ask_change3ms_f), 
+    bid_change3ms_s = as.numeric(bid_change3ms_s), 
+    ask_change3ms_s = as.numeric(ask_change3ms_s)
+  )
+
+write_csv(df_suddenchanges, "suddenchanges.csv")
 
